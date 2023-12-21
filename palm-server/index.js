@@ -3,38 +3,31 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 app.use(bodyParser.json());
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const { TextServiceClient } =
-  require("@google-ai/generativelanguage").v1beta2;
+// Access your API key as an environment variable (see "Set up your API key" above)
+const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+async function run(prompt) {
+  // For text-only input, use the gemini-pro model
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+  console.log(text);
+  return response.text();
+}
 
-const { GoogleAuth } = require("google-auth-library");
 
-const MODEL_NAME = "models/text-bison-001";
-const API_KEY = process.env.API_KEY;
 
-const client = new TextServiceClient({
-  authClient: new GoogleAuth().fromAPIKey(API_KEY),
-});
-
-let answer = null;
-let prompt = "Repeat after me: one, two,";
-
-app.post('/api', (req, res) => {
+app.post('/api', async (req, res) => {
   prompt = req.body.prompt;
-  client
-    .generateText({
-      model: MODEL_NAME,
-      prompt: {
-        text: prompt,
-      },
-    })
-    .then((result) => {
-      answer = result[0].candidates[0].output;
-      res.json(answer)
-    }).catch((err) => {
-      console.error(err.details);
-      res.json(err.details);
-    });
+  try {
+    const response = await run(prompt);
+    res.json(response);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('An error occurred while generating the story.');
+  }
 });
 
-app.listen(3333, () => console.log('Server running on port 3333'));
+app.listen(3333, () => console.log('Server is running on port 3333'));
